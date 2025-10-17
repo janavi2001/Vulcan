@@ -1,0 +1,6 @@
+--- .env.prod (before)
++++ .env.prod (after)
+@@ -1,2 +1,2 @@
+ ENVIRONMENT=prod
+-CPU_SPIN_MS=3000
++CPU_SPIN_MS=0
