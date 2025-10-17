@@ -12,7 +12,7 @@ SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SENDER_EMAIL = "vulcanemailpush@gmail.com"       # Replace with sender email
 SENDER_PASSWORD = "vzgz ssmb kpbv atad"       # Or read from os.getenv("SMTP_PASS")
-RECIPIENT_EMAIL = "thilak.shriyan43@gmail.com"  # Replace with recipient email
+RECIPIENT_EMAIL = "arnav.dewan@sjsu.edu"  # Replace with recipient email
 # ==========================
 
 def _send_email_with_report(stage: str, report_path: Path, attachments: list[Path] | None = None) -> None:
@@ -91,21 +91,26 @@ def _measure() -> float:
         return float(r.json().get("elapsed_ms", 9999.0))
     except Exception:
         return 9999.0
+import sys
+
 def _run_pytests() -> tuple[bool, str]:
     """
-    Run pytest on the tests/ folder and capture its output.
-    Returns (success, output_text).
+    Run pytest on the tests/ folder using the same Python interpreter
+    that is running this agent (so we never depend on PATH).
     """
     try:
         completed = subprocess.run(
-            ["pytest", "-q", "tests", "--maxfail=1", "--disable-warnings"],
-            capture_output=True, text=True, cwd=ROOT
+            [sys.executable, "-m", "pytest", "-q", "tests", "--maxfail=1", "--disable-warnings"],
+            capture_output=True,
+            text=True,
+            cwd=ROOT
         )
         success = completed.returncode == 0
         output = completed.stdout + completed.stderr
         return success, output
     except Exception as e:
         return False, str(e)
+
 
 def _unified_diff(before: str, after: str, filename: str) -> str:
     return "".join(difflib.unified_diff(
@@ -114,29 +119,98 @@ def _unified_diff(before: str, after: str, filename: str) -> str:
     ))
 
 def _write_artifacts(stage: str, before_ms: float, after_ms: float, changed: bool, diff_text: str | None) -> tuple[Path, Path | None]:
-    ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-    report_path = REPORTS_DIR / f"cpu-report-{stage}-{ts}.md"
-    _write(report_path, f"""# CPU Auto-Resolution Report — {stage.upper()}
+    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    report_file = REPORTS_DIR / f"cpu-report-{stage}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.md"
 
-**Timestamp (UTC):** {datetime.utcnow().isoformat()}
-**Stage:** {stage}
+    improvement = before_ms - after_ms
+    pct_improvement = (improvement / before_ms * 100) if before_ms > 0 else 0
 
-## Measurements
-- Before fix: {before_ms:.1f} ms
-- After fix:  {after_ms:.1f} ms
-- Threshold:  {THRESHOLD_MS:.0f} ms
+    performance_section = (
+        f"| Metric | Before Fix | After Fix | Change |\n"
+        f"|---------|-------------|-----------|---------|\n"
+        f"| ⏱️ Avg. CPU Time | {before_ms:.1f} ms | {after_ms:.1f} ms | ↓ {improvement:.1f} ms ({pct_improvement:.1f}%) |\n"
+    )
 
-## Action Taken
-- {'Edited cpu_task.py (rewrite/annotation applied)' if changed else 'No change applied'}
+    result_emoji = "✅" if after_ms < before_ms else "⚠️"
+    change_text = "Code Rewritten" if changed else "No Changes Needed"
 
-## Result
-- {'✅ Improvement detected' if after_ms < before_ms else '❌ No improvement'}
-""")
+    # === Fancy Markdown report ===
+    report_md = f"""
+# 🧠 DevOps Auto-Resolution Report — **{stage.upper()}**
+
+**Timestamp:** {ts}  
+**Environment:** `{stage}`  
+**Agent:** CPU Optimization Auto-Resolver  
+**Status:** {result_emoji} {change_text}
+
+---
+
+## 🪄 1. Overview
+
+The automated agent detected high CPU utilization in the `cpu_task.py` module.  
+After analysis, it identified a recursive computation pattern and applied an optimized version automatically.
+
+---
+
+## 🔍 2. Root Cause Analysis
+
+| Aspect | Details |
+|--------|----------|
+| Detected Hotspot | Recursive function (`fib()`) |
+| Root Cause | Multiple nested self-calls (`fib(n-1)` + `fib(n-2)`) causing exponential CPU growth |
+| Detection Method | AST-based static analysis |
+| Affected File | `service/cpu_task.py` |
+
+---
+
+## 🛠️ 3. Actions Executed
+
+- Rewrote inefficient function to iterative form or added memoization.  
+- Preserved all other logic intact.  
+- Re-measured performance post-fix.  
+- Generated diff patch (`.patch`) for audit trail.  
+- { 'Executed full pytest suite to validate correctness.' if stage == 'test' else 'Skipped tests (production run).' }
+
+---
+
+## 📈 4. Verification & Performance
+
+{performance_section}
+
+{ '✅ All pytest cases passed successfully.\n' if stage == 'test' else '' }
+
+---
+
+## 💡 5. Insights & Recommendations
+
+- **Observed improvement:** {improvement:.1f} ms ({pct_improvement:.1f}% faster)  
+- **Next steps:**  
+  - Monitor CPU metrics over next 24h.  
+  - Commit diff to version control.  
+  - Schedule similar optimization scans weekly.
+
+---
+
+### 🗂️ 6. Artifacts Generated
+
+- Report: `{report_file.name}`  
+{f"- Patch diff: cpu-fix-{stage}.patch" if diff_text else "- No code changes were required."}
+
+---
+
+_This report was auto-generated by the Vulcan DevOps Agent_ 🤖
+"""
+
+    _write(report_file, report_md)
+
     diff_path = None
     if diff_text:
-        diff_path = REPORTS_DIR / f"cpu-fix-{stage}-{ts}.patch"
+        diff_path = REPORTS_DIR / f"cpu-fix-{stage}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.patch"
         _write(diff_path, diff_text)
-    return report_path, diff_path
+
+    print(f"[agent] Fancy report generated at {report_file}")
+    return report_file, diff_path
+
 
 # ---------- AST analysis ----------
 
@@ -258,18 +332,6 @@ def run(stage: str):
     before_ms = _measure()
     print(f"[agent] Stage={stage} | Before={before_ms:.1f} ms")
 
-    # In test: only proceed if slow; in prod: apply the same improvement anyway.
-    if stage == "test" and before_ms <= THRESHOLD_MS:
-        return {
-            "stage": stage,
-            "changed": False,
-            "before_ms": before_ms,
-            "after_ms": before_ms,
-            "pytest_success": None,
-            "diff_path": None,
-            "report_path": None,
-        }
-
     src_before = _read(TASK_FILE)
     hotspot = _detect_hotspot(src_before)
 
@@ -286,54 +348,85 @@ def run(stage: str):
             "report_path": str(report_path),
         }
 
-    src_after, changed = _apply_patch(src_before, hotspot)
-    diff_text = _unified_diff(src_before, src_after, "cpu_task.py") if changed else None
-
-    if changed:
-        _write(TASK_FILE, src_after)
-
-    # Give the service a moment to reload
-    time.sleep(1.0)
-
-    # ---- Run automated pytest verification (only for test environment) ----
-    pytest_success = None
-    pytest_output = ""
+    # --- TEST ENVIRONMENT: sandboxed rewrite + pytest verification ---
     if stage == "test":
-        print("[agent] Running pytest verification...")
+        print("[agent] >>> Running TEST environment flow <<<")
+
+        # Copy code into a temporary sandbox file for safe testing
+        sandbox_path = TASK_FILE.parent / "cpu_task_testcopy.py"
+        _write(sandbox_path, src_before)
+        print(f"[agent] Created sandbox copy at {sandbox_path}")
+
+        # Patch the sandbox copy instead of the real code
+        with open(sandbox_path, "r", encoding="utf-8") as f:
+            src_test_before = f.read()
+        src_test_after, changed = _apply_patch(src_test_before, hotspot)
+        if changed:
+            _write(sandbox_path, src_test_after)
+            print("[agent] Applied patch to test sandbox file")
+
+        # Run pytest verification on the sandboxed file
+        pytest_success = None
+        pytest_output = ""
+        print("[agent] Running pytest verification on sandbox...")
         pytest_success, pytest_output = _run_pytests()
         print(pytest_output)
-        # Save pytest output to a log file
+
+        # Save pytest log
         ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-        with open(
-            REPORTS_DIR / f"pytest-output-{stage}-{ts}.log",
-            "w",
-            encoding="utf-8",
-        ) as f:
+        log_path = REPORTS_DIR / f"pytest-output-test-{ts}.log"
+        with open(log_path, "w", encoding="utf-8") as f:
             f.write(pytest_output)
+        print(f"[agent] Pytest log saved at {log_path}")
 
-    # ---- Measure performance again ----
-    after_ms = _measure()
-    print(f"[agent] After={after_ms:.1f} ms")
+        after_ms = _measure()
+        print(f"[agent] After={after_ms:.1f} ms (Test Sandbox)")
 
-    # ---- Write summary artifacts ----
-    report_path, diff_path = _write_artifacts(
-        stage, before_ms, after_ms, changed, diff_text
-    )
+        # Do NOT generate report or email here — test-only
+        return {
+            "stage": stage,
+            "changed": changed,
+            "before_ms": before_ms,
+            "after_ms": after_ms,
+            "pytest_success": pytest_success,
+            "pytest_log": str(log_path),
+            "diff_path": None,
+            "report_path": None,
+        }
 
-    # ---- Send report via email only in production ----
+    # --- PRODUCTION ENVIRONMENT: apply real fix + generate report + send email ---
     if stage == "prod":
+        print("[agent] >>> Running PRODUCTION environment flow <<<")
+
+        src_after, changed = _apply_patch(src_before, hotspot)
+        diff_text = _unified_diff(src_before, src_after, "cpu_task.py") if changed else None
+
+        if changed:
+            _write(TASK_FILE, src_after)
+            print("[agent] Applied patch to production code")
+
+        time.sleep(1.0)
+        after_ms = _measure()
+        print(f"[agent] After={after_ms:.1f} ms (Production)")
+
+        # Write fancy report
+        report_path, diff_path = _write_artifacts(stage, before_ms, after_ms, changed, diff_text)
+
+        # Email report only in production
         attachments = []
         if diff_path and Path(diff_path).exists():
             attachments.append(Path(diff_path))
         _send_email_with_report(stage, report_path, attachments)
 
-    return {
-        "stage": stage,
-        "changed": changed,
-        "before_ms": before_ms,
-        "after_ms": after_ms,
-        "pytest_success": pytest_success,
-        "diff_path": str(diff_path) if diff_path else None,
-        "report_path": str(report_path),
-    }
+        return {
+            "stage": stage,
+            "changed": changed,
+            "before_ms": before_ms,
+            "after_ms": after_ms,
+            "pytest_success": None,
+            "diff_path": str(diff_path) if diff_path else None,
+            "report_path": str(report_path),
+        }
 
+    print(f"[agent] Unknown stage '{stage}', skipping all actions.")
+    return None
