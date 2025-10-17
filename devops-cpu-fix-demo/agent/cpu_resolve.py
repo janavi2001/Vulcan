@@ -8,7 +8,7 @@ TASK_FILE = SERVICE_DIR / "cpu_task.py"
 REPORTS_DIR = Path(__file__).resolve().parent / "knowledge"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-HEAVY_URL = "http://127.0.0.1:8000/api/heavy"
+HEAVY_URL = "http://127.0.0.1:8069/api/heavy"
 THRESHOLD_MS = 1500.0
 
 def _read(p: Path) -> str:
