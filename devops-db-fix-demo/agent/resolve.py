@@ -9,8 +9,8 @@ ENV_PROD = SERVICE_DIR / ".env.prod"
 REPORTS_DIR = Path(__file__).resolve().parent / "knowledge"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-APP_USERS_URL = "http://127.0.0.1:8000/api/users"
-METRICS_URL = "http://127.0.0.1:8000/metrics"
+APP_USERS_URL = "http://127.0.0.1:8069/api/users"
+METRICS_URL = "http://127.0.0.1:8069/metrics"
 
 
 def _read(p: Path) -> str:

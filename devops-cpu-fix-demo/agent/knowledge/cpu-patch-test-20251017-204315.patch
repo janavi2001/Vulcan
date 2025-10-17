@@ -1,0 +1,6 @@
+--- .env.test (before)
++++ .env.test (after)
+@@ -1,2 +1,2 @@
+ ENVIRONMENT=test
+-CPU_SPIN_MS=3000
++CPU_SPIN_MS=0
