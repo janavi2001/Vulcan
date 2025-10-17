@@ -10,7 +10,9 @@ import cpu_resolve  # noqa: E402
 
 @app.post("/cpu/fix-test")
 def cpu_fix_test():
+    print("=== Running fix-test ===")
     res = cpu_resolve.run("test")
+    print("=== Finished fix-test ===")
     return JSONResponse({"ok": True, "stage": "test", "meta": res})
 
 @app.post("/cpu/promote-prod")
