@@ -1,0 +1,9 @@
+--- .env.test (before)
++++ .env.test (after)
+@@ -1,5 +1,5 @@
+ ENVIRONMENT=test
+-DB_HOST=postgresql
++DB_HOST=postgres
+ DB_PORT=5432
+ DB_NAME=demo
+ DB_USER=demo

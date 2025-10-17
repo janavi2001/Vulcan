@@ -1,0 +1,11 @@
+groups:
+- name: demo-service
+  rules:
+  - alert: DBConnectionErrorsHigh
+    expr: increase(db_connection_errors_total[1m]) > 0
+    for: 1m
+    labels:
+      severity: page
+    annotations:
+      summary: "Database connection errors in {{ $labels.env }}"
+      description: "App cannot reach Postgres (wrong host or credentials)."

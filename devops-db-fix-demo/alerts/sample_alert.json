@@ -1,0 +1,17 @@
+{
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "DBConnectionErrorsHigh",
+        "severity": "page",
+        "service": "demo-service",
+        "env": "test"
+      },
+      "annotations": {
+        "summary": "Database connection errors in test",
+        "description": "App cannot reach Postgres (wrong host or credentials)."
+      }
+    }
+  ]
+}
